@@ -96,45 +96,52 @@ impl ImeStage {
 }
 
 /// For running after the bottom screen's `ctx.run`
-pub(crate) fn ime_part_b(ime: &mut Option<egui::output::IMEOutput>, ime_stage: &ImeStage, current_text_value: &mut Option<String>, current_float_value: &mut Option<f64>, out: &egui::FullOutput) {
+pub(crate) fn ime_part_b(
+    ime: &mut Option<egui::output::IMEOutput>,
+    ime_stage: &ImeStage,
+    current_text_value: &mut Option<String>,
+    current_float_value: &mut Option<f64>,
+    out: &egui::FullOutput,
+) {
     for e in &out.platform_output.events {
-        match e {
-            egui::output::OutputEvent::Clicked(widget_info) => {
-                if *ime_stage == ImeStage::Nothing {
-                    *current_text_value = widget_info.current_text_value.clone();
-                    *current_float_value = widget_info.value.clone();
-                }
-            }
-            _ => (),
+        if let egui::output::OutputEvent::Clicked(widget_info) = e
+            && *ime_stage == ImeStage::Nothing
+        {
+            *current_text_value = widget_info.current_text_value.clone();
+            *current_float_value = widget_info.value;
         }
     }
     *ime = out.platform_output.ime;
 }
 
 /// For running before running the bottom screen's `ctx.run`
-pub(crate) fn ime_part_a(gfx: &ctru::prelude::Gfx, apt: &ctru::prelude::Apt, ime_output: Option<egui::output::IMEOutput>, ime_stage: &mut ImeStage, current_text_value: &mut Option<String>, current_float_value: &mut Option<f64>, events: &mut Vec<egui::Event>) {
-    if let Some(_) = ime_output {
-        if *ime_stage == ImeStage::Nothing {
-            use ctru::applets::swkbd;
-            let mut kbd = swkbd::SoftwareKeyboard::new(
-                swkbd::Kind::Normal,
-                swkbd::ButtonConfig::LeftRight,
-            );
-            kbd.set_initial_text(
-                current_text_value
+pub(crate) fn ime_part_a(
+    gfx: &ctru::prelude::Gfx,
+    apt: &ctru::prelude::Apt,
+    ime_output: Option<egui::output::IMEOutput>,
+    ime_stage: &mut ImeStage,
+    current_text_value: &mut Option<String>,
+    current_float_value: &mut Option<f64>,
+    events: &mut Vec<egui::Event>,
+) {
+    if ime_output.is_some() && *ime_stage == ImeStage::Nothing {
+        use ctru::applets::swkbd;
+        let mut kbd =
+            swkbd::SoftwareKeyboard::new(swkbd::Kind::Normal, swkbd::ButtonConfig::LeftRight);
+        kbd.set_initial_text(
+            current_text_value
+                .take()
+                .map(std::borrow::Cow::Owned)
+                .or(current_float_value
                     .take()
-                    .map(|x| std::borrow::Cow::Owned(x))
-                    .or(current_float_value
-                        .take()
-                        .map(|x| std::borrow::Cow::Owned(x.to_string()))),
-            );
-            let (text, button) = kbd.launch(apt, gfx).unwrap();
-            if button == swkbd::Button::Right {
-                *current_text_value = Some(text);
-                *ime_stage = ImeStage::START;
-            } else {
-                *ime_stage = ImeStage::CANCEL;
-            }
+                    .map(|x| std::borrow::Cow::Owned(x.to_string()))),
+        );
+        let (text, button) = kbd.launch(apt, gfx).unwrap();
+        if button == swkbd::Button::Right {
+            *current_text_value = Some(text);
+            *ime_stage = ImeStage::START;
+        } else {
+            *ime_stage = ImeStage::CANCEL;
         }
     }
     if ime_stage.add_event(events) {

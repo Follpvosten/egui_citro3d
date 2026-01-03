@@ -17,5 +17,7 @@
         // This should be the same as your usual $PATH, but with devkitPro paths added to the beginning.
         // Might not be necessary if you already added these to your host $PATH.
         "PATH": "/opt/devkitpro/devkitARM/bin:/opt/devkitpro/tools/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
-    }
+    },
+    "rust-analyzer.cargo.features": "all",
+    "rust-analyzer.check.features": "all"
 }

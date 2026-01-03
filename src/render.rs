@@ -1,60 +1,61 @@
-use citro3d::math::FVec4;
-
-use crate::texdelta;
-
-use super::configure_texenvs;
-
-#[cfg(feature = "dbg_printlns")]
-use ctru::prelude::KeyPad;
-
-use super::TexAndData;
-
 use std::collections::HashMap;
 
-use citro3d::Instance;
+use citro3d::{math::FVec4, render::RenderPass};
+
+use super::{TexAndData, configure_texenvs};
+use crate::texdelta;
 
 #[cfg(feature = "dbg_printlns")]
-use ctru::prelude::Hid;
+use ctru::prelude::{Hid, KeyPad};
 
-pub(crate) fn everything_that_happens_after_out(
-    #[cfg(feature = "dbg_printlns")] hid: &Hid,
-    instance: &mut Instance,
-    ctx: &egui::Context,
-    texmap: &mut HashMap<egui::TextureId, TexAndData>,
-    twovecs: [[f32; 4]; 2],
-    projection_uniform_idx: citro3d::uniform::Index,
-    attr_info: &citro3d::attrib::Info,
-    render_target: &mut citro3d::render::Target<'_>,
-    out: egui::FullOutput,
-) {
+pub(crate) struct RenderContext<'a, 'frame> {
     #[cfg(feature = "dbg_printlns")]
-    if !out.textures_delta.set.is_empty() {
-        println!("Adding/Patching {} Textures", out.textures_delta.set.len());
-    }
-    #[cfg(feature = "dbg_printlns")]
-    if hid.keys_down().contains(KeyPad::B) {
-        println!("Rendering {} shapes", out.shapes.len());
-    }
-    #[cfg(feature = "dbg_printlns")]
-    if hid.keys_down().contains(KeyPad::Y) {
-        println!("{:#?}", out.shapes);
-    }
+    pub hid: &'a Hid,
+    pub pass: RenderPass<'frame>,
+    pub ctx: &'a egui::Context,
+    pub texmap: &'a mut HashMap<egui::TextureId, TexAndData>,
+    pub projection_uniform_idx: citro3d::uniform::Index,
+    pub attr_info: &'a citro3d::attrib::Info,
+}
 
-    texdelta::texdelta(texmap, out.textures_delta.set);
-    let tessel = ctx.tessellate(out.shapes, 1.0);
+impl<'a, 'frame> RenderContext<'a, 'frame>
+where
+    'a: 'frame,
+{
+    pub(crate) fn render(
+        &mut self,
+        twovecs: [[f32; 4]; 2],
+        render_target: &'a mut citro3d::render::Target<'_>,
+        out: egui::FullOutput,
+    ) {
+        #[cfg(feature = "dbg_printlns")]
+        {
+            if !out.textures_delta.set.is_empty() {
+                println!("Adding/Patching {} Textures", out.textures_delta.set.len());
+            }
+            if self.hid.keys_down().contains(KeyPad::B) {
+                println!("Rendering {} shapes", out.shapes.len());
+            }
+            if self.hid.keys_down().contains(KeyPad::Y) {
+                println!("{:#?}", out.shapes);
+            }
+        }
 
-    instance.render_frame_with(|instance| {
+        texdelta::texdelta(self.texmap, out.textures_delta.set);
+        let tessel = self.ctx.tessellate(out.shapes, 1.0);
+
         render_target.clear(citro3d::render::ClearFlags::ALL, 0xFF_00_00_00, 0);
         // let mut last_christmas_i_gave_you_my = None;
 
-        instance
+        self.pass
             .select_render_target(&*render_target)
             .expect("wharg");
 
-        instance.bind_vertex_uniform(projection_uniform_idx, twovecs_to_uniform(twovecs));
-        instance.set_attr_info(attr_info);
+        self.pass
+            .bind_vertex_uniform(self.projection_uniform_idx, twovecs_to_uniform(twovecs));
+        self.pass.set_attr_info(self.attr_info);
         #[cfg(feature = "dbg_printlns")]
-        if hid.keys_down().contains(KeyPad::B) {
+        if self.hid.keys_down().contains(KeyPad::B) {
             println!("Rendering {} prims", tessel.len());
         }
         for t in tessel.into_iter() {
@@ -64,12 +65,12 @@ pub(crate) fn everything_that_happens_after_out(
                     continue;
                 }
             };
-            let TexAndData { tex, data } = texmap.get_mut(&mesh.texture_id).unwrap();
+            let TexAndData { tex, data } = self.texmap.get_mut(&mesh.texture_id).unwrap();
             tex.bind(0);
-            configure_texenvs::configure_texenv(instance, data);
+            configure_texenvs::configure_texenv(&mut self.pass, data);
             for mesh in mesh.split_to_u16() {
                 #[cfg(feature = "dbg_printlns")]
-                if hid.keys_down().contains(KeyPad::X) {
+                if self.hid.keys_down().contains(KeyPad::X) {
                     println!("Tex  : {}x{}@{}", tex.width, tex.height, tex.format);
                     println!("Verts: ");
                     for vert in &mesh.vertices {
@@ -102,9 +103,9 @@ pub(crate) fn everything_that_happens_after_out(
                 C3D_DirtyTexEnv(te);
             }
         }
-    });
-    for remove in out.textures_delta.free {
-        texmap.remove(&remove);
+        for remove in out.textures_delta.free {
+            self.texmap.remove(&remove);
+        }
     }
 }
 

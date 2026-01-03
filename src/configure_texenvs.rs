@@ -1,8 +1,8 @@
 use super::ImgDat;
 
-use citro3d::Instance;
+use citro3d::render::RenderPass;
 
-pub(crate) fn configure_font_texenv(instance: &mut Instance) {
+pub(crate) fn configure_font_texenv(instance: &mut RenderPass<'_>) {
     use citro3d::texenv;
     let stage0 = texenv::Stage::new(0).unwrap();
     let texenv0 = instance.texenv(stage0);
@@ -19,7 +19,7 @@ pub(crate) fn configure_font_texenv(instance: &mut Instance) {
         .func(texenv::Mode::ALPHA, texenv::CombineFunc::Modulate);
 }
 
-pub(crate) fn configure_rgba8_texenv(instance: &mut Instance) {
+pub(crate) fn configure_rgba8_texenv(instance: &mut RenderPass<'_>) {
     use citro3d::texenv;
     let stage0 = texenv::Stage::new(0).unwrap();
     let texenv0 = instance.texenv(stage0);
@@ -36,7 +36,7 @@ pub(crate) fn configure_rgba8_texenv(instance: &mut Instance) {
         .func(texenv::Mode::ALPHA, texenv::CombineFunc::Modulate);
 }
 
-pub(crate) fn configure_texenv(instance: &mut Instance, data: &ImgDat) {
+pub(crate) fn configure_texenv(instance: &mut RenderPass<'_>, data: &ImgDat) {
     match data {
         ImgDat::Rgba8(..) => {
             configure_rgba8_texenv(instance);

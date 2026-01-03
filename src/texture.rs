@@ -16,7 +16,6 @@ impl Texture {
                 citro3d_sys::C3D_TexInit(&mut internal, width, height, format)
             }
         } {
-
             Texture {
                 internal,
                 width,
@@ -30,8 +29,9 @@ impl Texture {
             panic!("Texture could not be created!");
         }
     }
-    ///Ensure that the buffer's size matches the width, height, and format of the texture.
-    ///If it is too small, the 3DS **WILL** start reading who knows what data!
+    /// # Safety
+    /// Ensure that the buffer's size matches the width, height, and format of the texture.
+    /// If it is too small, the 3DS **WILL** start reading who knows what data!
     pub unsafe fn upload(&mut self, buffer: &[u8]) {
         unsafe {
             citro3d_sys::C3D_TexUpload(&mut self.internal, buffer.as_ptr().cast());
@@ -55,10 +55,7 @@ impl Texture {
             citro3d_sys::C3D_TexSetFilter(&mut self.internal, mag, min);
         }
     }
-    pub fn set_wrap(
-        &mut self,
-        wrap: ctru_sys::GPU_TEXTURE_WRAP_PARAM
-    ) {
+    pub fn set_wrap(&mut self, wrap: ctru_sys::GPU_TEXTURE_WRAP_PARAM) {
         unsafe {
             citro3d_sys::C3D_TexSetWrap(&mut self.internal, wrap, wrap);
         }

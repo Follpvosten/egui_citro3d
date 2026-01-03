@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ops::Deref};
 
 use ctru_sys::{GPU_A8, GPU_RGBA8};
-use egui::{epaint, Color32};
+use egui::{Color32, epaint};
 use swizzle_3ds::pix::ImageView;
 
 use crate::texture::Texture;
@@ -85,7 +85,7 @@ fn single_delta(
                 },
                 match delta_to_data {
                     super::ImgDat::Rgba8(..) => false,
-                    super::ImgDat::Alpha8(..) => true
+                    super::ImgDat::Alpha8(..) => true,
                 },
             );
 
@@ -112,19 +112,11 @@ fn single_delta(
         egui_filter_to_3ds(delta.options.magnification),
         egui_filter_to_3ds(delta.options.minification),
     );
-    tad.tex.set_wrap(
-        match delta.options.wrap_mode {
-            egui::TextureWrapMode::ClampToEdge => {
-                ctru_sys::GPU_CLAMP_TO_EDGE
-            },
-            egui::TextureWrapMode::Repeat => {
-                ctru_sys::GPU_REPEAT
-            },
-            egui::TextureWrapMode::MirroredRepeat => {
-                ctru_sys::GPU_MIRRORED_REPEAT
-            },
-        }
-    );
+    tad.tex.set_wrap(match delta.options.wrap_mode {
+        egui::TextureWrapMode::ClampToEdge => ctru_sys::GPU_CLAMP_TO_EDGE,
+        egui::TextureWrapMode::Repeat => ctru_sys::GPU_REPEAT,
+        egui::TextureWrapMode::MirroredRepeat => ctru_sys::GPU_MIRRORED_REPEAT,
+    });
     texmap.insert(texid, tad);
 }
 
@@ -132,7 +124,7 @@ fn patch_texture<T: Copy>(
     delta: &epaint::ImageDelta,
     tex: &Texture,
     vec: Vec<T>,
-    to_patch: &mut Vec<T>,
+    to_patch: &mut [T],
     x: usize,
     y: usize,
 ) {
@@ -152,20 +144,20 @@ fn delta_to_data(delta: &epaint::ImageDelta) -> super::ImgDat {
     }
 }
 
-fn convert_font_to_lum8(x: &Vec<f32>) -> Vec<u8> {
+fn convert_font_to_lum8(x: &[f32]) -> Vec<u8> {
     let mut max = (-1isize, 0.0);
-    for (i, &x) in x.into_iter().enumerate() {
+    for (i, &x) in x.iter().enumerate() {
         if x > max.1 {
             max = (i as isize, x);
         }
     }
     #[cfg(feature = "dbg_printlns")]
     println!("Max Pixel: #{} with value {}", max.0, max.1);
-    x.into_iter().map(|&x| (x * 255.0).floor() as u8).collect()
+    x.iter().map(|&x| (x * 255.0).floor() as u8).collect()
 }
 
-fn convert_color32_to_rgba8(x: &Vec<Color32>) -> Vec<u32> {
-    x.into_iter()
+fn convert_color32_to_rgba8(x: &[Color32]) -> Vec<u32> {
+    x.iter()
         .map(|&x| {
             // let a = 255.0 / (x.a() as f32);
             // let (r, g, b) = (
@@ -177,7 +169,7 @@ fn convert_color32_to_rgba8(x: &Vec<Color32>) -> Vec<u32> {
             // if !(x.r() == x.g() && x.g() == x.b() && x.b() == x.a()) {
             //     println!("Halleleuja!");
             // }
-            u32::from_le_bytes([x.r(),x.g(),x.b(),x.a()])
+            u32::from_le_bytes([x.r(), x.g(), x.b(), x.a()])
         })
         .collect()
 }
@@ -219,7 +211,10 @@ fn compare_tad_with_delta(
             ComparisonResult::Panic
         };
     }
-    if same_data_type && delta.image.width() == tad.tex.width as usize && delta.image.height() == tad.tex.height as usize {
+    if same_data_type
+        && delta.image.width() == tad.tex.width as usize
+        && delta.image.height() == tad.tex.height as usize
+    {
         ComparisonResult::ReuseTexture
     } else {
         ComparisonResult::CreateNewTexture
