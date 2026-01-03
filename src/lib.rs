@@ -94,10 +94,11 @@ pub fn run_egui(mut run_ui: impl FnMut(&egui::Context, Specifics)) {
         top_viewport_id,
     );
 
-    let mut ime: Option<egui::output::IMEOutput> = None;
-    let mut ime_stage = ime::ImeStage::Nothing;
-    let mut current_text_value: Option<String> = None;
-    let mut current_float_value: Option<f64> = None;
+    // let mut ime: Option<egui::output::IMEOutput> = None;
+    // let mut ime_stage = ime::ImeStage::Nothing;
+    // let mut current_text_value: Option<String> = None;
+    // let mut current_float_value: Option<f64> = None;
+    let mut ime = ime::Ime::new();
     let mut last_pos: egui::Pos2 = Default::default();
     unsafe {
         //If you delete this call, faces *will* be culled
@@ -113,15 +114,7 @@ pub fn run_egui(mut run_ui: impl FnMut(&egui::Context, Specifics)) {
         if start_button {
             break;
         }
-        ime::ime_part_a(
-            &gfx,
-            &apt,
-            ime,
-            &mut ime_stage,
-            &mut current_text_value,
-            &mut current_float_value,
-            &mut events,
-        );
+        ime.handle_input(&gfx, &apt, &mut events);
         let bottom_out = ctx.run(
             egui::RawInput {
                 events,
@@ -143,13 +136,7 @@ pub fn run_egui(mut run_ui: impl FnMut(&egui::Context, Specifics)) {
                 );
             },
         );
-        ime::ime_part_b(
-            &mut ime,
-            &ime_stage,
-            &mut current_text_value,
-            &mut current_float_value,
-            &bottom_out,
-        );
+        ime.handle_output(&bottom_out);
         let top_out = ctx.run(
             egui::RawInput {
                 viewport_id: top_viewport_id,

@@ -26,6 +26,9 @@ impl ImeStage {
             EscapeUp => Nothing,
         }
     }
+    pub(crate) fn advance(&mut self) {
+        *self = self.next();
+    }
     pub(crate) fn add_event(self, events: &mut Vec<egui::Event>) -> bool {
         use ImeStage::*;
         match self {
@@ -95,59 +98,68 @@ impl ImeStage {
     }
 }
 
-/// For running after the bottom screen's `ctx.run`
-pub(crate) fn ime_part_b(
-    ime: &mut Option<egui::output::IMEOutput>,
-    ime_stage: &ImeStage,
-    current_text_value: &mut Option<String>,
-    current_float_value: &mut Option<f64>,
-    out: &egui::FullOutput,
-) {
-    for e in &out.platform_output.events {
-        if let egui::output::OutputEvent::Clicked(widget_info) = e
-            && *ime_stage == ImeStage::Nothing
-        {
-            *current_text_value = widget_info.current_text_value.clone();
-            *current_float_value = widget_info.value;
-        }
-    }
-    *ime = out.platform_output.ime;
+pub(crate) struct Ime {
+    output: Option<egui::output::IMEOutput>,
+    stage: ImeStage,
+    current_text_value: Option<String>,
+    current_float_value: Option<f64>,
 }
 
-/// For running before running the bottom screen's `ctx.run`
-pub(crate) fn ime_part_a(
-    gfx: &ctru::prelude::Gfx,
-    apt: &ctru::prelude::Apt,
-    ime_output: Option<egui::output::IMEOutput>,
-    ime_stage: &mut ImeStage,
-    current_text_value: &mut Option<String>,
-    current_float_value: &mut Option<f64>,
-    events: &mut Vec<egui::Event>,
-) {
-    if ime_output.is_some() && *ime_stage == ImeStage::Nothing {
-        use ctru::applets::swkbd;
-        let mut kbd =
-            swkbd::SoftwareKeyboard::new(swkbd::Kind::Normal, swkbd::ButtonConfig::LeftRight);
-        kbd.set_initial_text(
-            current_text_value
-                .take()
-                .map(std::borrow::Cow::Owned)
-                .or(current_float_value
-                    .take()
-                    .map(|x| std::borrow::Cow::Owned(x.to_string()))),
-        );
-        let (text, button) = kbd.launch(apt, gfx).unwrap();
-        if button == swkbd::Button::Right {
-            *current_text_value = Some(text);
-            *ime_stage = ImeStage::START;
-        } else {
-            *ime_stage = ImeStage::CANCEL;
+impl Ime {
+    pub(crate) fn new() -> Self {
+        Self {
+            output: None,
+            stage: ImeStage::Nothing,
+            current_text_value: None,
+            current_float_value: None,
         }
     }
-    if ime_stage.add_event(events) {
-        events.push(egui::Event::Text(
-            current_text_value.take().unwrap_or_default(),
-        ));
+    /// Run this before the bottom screen's ctx.run...
+    pub(crate) fn handle_input(
+        &mut self,
+        gfx: &ctru::prelude::Gfx,
+        apt: &ctru::prelude::Apt,
+        events: &mut Vec<egui::Event>,
+    ) {
+        if self.output.is_some() && self.stage == ImeStage::Nothing {
+            use ctru::applets::swkbd;
+            let mut kbd =
+                swkbd::SoftwareKeyboard::new(swkbd::Kind::Normal, swkbd::ButtonConfig::LeftRight);
+            kbd.set_initial_text(
+                self.current_text_value
+                    .take()
+                    .map(std::borrow::Cow::Owned)
+                    .or(self
+                        .current_float_value
+                        .take()
+                        .map(|x| std::borrow::Cow::Owned(x.to_string()))),
+            );
+            let (text, button) = kbd.launch(apt, gfx).unwrap();
+            if button == swkbd::Button::Right {
+                self.current_text_value = Some(text);
+                self.stage = ImeStage::START;
+            } else {
+                self.stage = ImeStage::CANCEL;
+            }
+        }
+        if self.stage.add_event(events) {
+            events.push(egui::Event::Text(
+                self.current_text_value.take().unwrap_or_default(),
+            ));
+        }
+        self.stage.advance();
     }
-    *ime_stage = ime_stage.next();
+
+    /// ...and run this after the bottom screen's ctx.run
+    pub(crate) fn handle_output(&mut self, out: &egui::FullOutput) {
+        for e in &out.platform_output.events {
+            if let egui::output::OutputEvent::Clicked(widget_info) = e
+                && self.stage == ImeStage::Nothing
+            {
+                self.current_text_value = widget_info.current_text_value.clone();
+                self.current_float_value = widget_info.value;
+            }
+        }
+        self.output = out.platform_output.ime;
+    }
 }
